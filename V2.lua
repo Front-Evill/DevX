@@ -19,7 +19,7 @@ local SocialService = game:GetService("SocialService")
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
 
-local AnimState, EmoteState, CommandActions, Commands, targetCmds, targetCreated, playAnim, stopAnimAll
+local AnimState, EmoteState, CommandActions, Commands, targetCmds, targetCreated, playAnim, stopAnimAll, animCmds
 local camera = workspace.CurrentCamera
 
 while not camera do
@@ -136,6 +136,11 @@ end
 
 local function getHumanoid(char)
 	return char and char:FindFirstChildOfClass("Humanoid")
+end
+
+local function r15(plr)
+	local hum = getHumanoid(plr.Character)
+	return hum and hum.RigType == Enum.HumanoidRigType.R15
 end
 
 local function getRoot(char)
@@ -433,7 +438,7 @@ sidebar.Parent = window
 local sideLayout = Instance.new("UIListLayout", sidebar)
 sideLayout.SortOrder = Enum.SortOrder.LayoutOrder
 
-function sideTab(icon, label, order)
+local function sideTab(icon, label, order)
 	local btn = Instance.new("TextButton")
 	btn.Name = "Row_" .. label
 	btn.LayoutOrder = order
@@ -444,15 +449,45 @@ function sideTab(icon, label, order)
 	btn.ZIndex = 3
 	btn.Parent = sidebar
 
-	local iconLabel = Instance.new("TextLabel")
+	local iconLabel
+	if Settings.icons["FrontEvill-" .. icon] or icon ~= "crosshair" then
+		iconLabel = Instance.new("ImageLabel")
+		iconLabel.Image = Settings.icon(icon)
+		iconLabel.ImageColor3 = Colors.gray120
+	else
+		iconLabel = Instance.new("Frame")
+		local ring = Instance.new("Frame")
+		ring.AnchorPoint = Vector2.new(0.5, 0.5)
+		ring.Position = UDim2.new(0.5, 0, 0.5, 0)
+		ring.Size = UDim2.new(0, 12, 0, 12)
+		ring.BackgroundTransparency = 1
+		ring.ZIndex = 3
+		ring.Parent = iconLabel
+		Instance.new("UICorner", ring).CornerRadius = UDim.new(1, 0)
+		local stroke = Instance.new("UIStroke", ring)
+		stroke.Thickness = 1.5
+		stroke.Color = Colors.gray120
+		local bars = {
+			{UDim2.new(0.5, -1, 0, 0), UDim2.new(0, 2, 0, 5)},
+			{UDim2.new(0.5, -1, 1, -5), UDim2.new(0, 2, 0, 5)},
+			{UDim2.new(0, 0, 0.5, -1), UDim2.new(0, 5, 0, 2)},
+			{UDim2.new(1, -5, 0.5, -1), UDim2.new(0, 5, 0, 2)},
+			{UDim2.new(0.5, -1, 0.5, -1), UDim2.new(0, 2, 0, 2)},
+		}
+		for _, b in ipairs(bars) do
+			local bar = Instance.new("Frame")
+			bar.Position = b[1]
+			bar.Size = b[2]
+			bar.BorderSizePixel = 0
+			bar.BackgroundColor3 = Colors.gray120
+			bar.ZIndex = 3
+			bar.Parent = iconLabel
+		end
+	end
 	iconLabel.Name = "Icon"
 	iconLabel.BackgroundTransparency = 1
-	iconLabel.Position = UDim2.new(0,14,0,0)
-	iconLabel.Size = UDim2.new(0,20,1,0)
-	iconLabel.Font = Enum.Font.GothamBold
-	iconLabel.TextSize = 15
-	iconLabel.TextColor3 = Colors.gray120
-	iconLabel.Text = icon
+	iconLabel.Position = UDim2.new(0,14,0.5,-9)
+	iconLabel.Size = UDim2.new(0,18,0,18)
 	iconLabel.ZIndex = 3
 	iconLabel.Parent = btn
 
@@ -482,8 +517,8 @@ function sideTab(icon, label, order)
 	return btn, underline
 end
 
-local tabLogs, tabLogsUnderline = sideTab("L", "Logs", 1)
-local tabCmds, tabCmdsUnderline = sideTab("C", "Cmds", 2)
+local tabLogs, tabLogsUnderline = sideTab("scroll", "Logs", 1)
+local tabCmds, tabCmdsUnderline = sideTab("terminal", "Cmds", 2)
 
 Settings.tab = Instance.new("ImageButton")
 Settings.tab.Name = "TabSettings"
@@ -2030,10 +2065,26 @@ end)
 Settings.tabs = {}
 Settings.tabList = {}
 
-function addTab(key, btn, underline, panel, onOpen)
+local function addTab(key, btn, underline, panel, onOpen)
 	Settings.tabs[key] = { btn = btn, underline = underline, panel = panel, onOpen = onOpen }
 	table.insert(Settings.tabList, key)
 	btn.MouseButton1Click:Connect(function() Settings.switchTab(key) end)
+end
+
+local function tintIcon(icon, color)
+	if icon:IsA("ImageLabel") then
+		icon.ImageColor3 = color
+	elseif icon:IsA("TextLabel") then
+		icon.TextColor3 = color
+	else
+		for _, part in ipairs(icon:GetDescendants()) do
+			if part:IsA("UIStroke") then
+				part.Color = color
+			elseif part:IsA("Frame") then
+				part.BackgroundColor3 = color
+			end
+		end
+	end
 end
 
 function Settings.paintTabs()
@@ -2043,7 +2094,7 @@ function Settings.paintTabs()
 		local selected = key == tab
 		local icon, name = t.btn:FindFirstChild("Icon"), t.btn:FindFirstChild("Name")
 		if icon or name then
-			if icon then icon.TextColor3 = selected and on or off end
+			if icon then tintIcon(icon, selected and on or off) end
 			if name then name.TextColor3 = selected and on or off end
 		elseif t.btn:IsA("ImageButton") then
 			t.btn.ImageColor3 = selected and on or Colors.gray200
@@ -2188,27 +2239,6 @@ end)
 
 getgenv().devxUnload = Settings.unload
 
-Settings = Settings
-Theme = Theme
-Outline = Outline
-CmdSearch = CmdSearch
-Colors = Colors
-player = player
-camera = camera
-playerGui = playerGui
-window = window
-screenGui = screenGui
-hotbar = hotbar
-sidebar = sidebar
-SIDE_W = SIDE_W
-commandInput = commandInput
-notify = notify
-getRoot = getRoot
-getHumanoid = getHumanoid
-copy = copy
-executeCommand = executeCommand
-DISCORD_LINK = DISCORD_LINK
-
 local function start()
 task.spawn(function()
 	for index, cmd in ipairs(Commands) do
@@ -2231,18 +2261,6 @@ pushEntry("Print", "DevX Console loaded – "..#Commands.." commands ready. Pres
 end
 
 (function()
-	local HttpService = game:GetService("HttpService")
-	local RunService = game:GetService("RunService")
-	local Players = game:GetService("Players")
-
-	local function getHumanoid(char)
-		return char and char:FindFirstChildOfClass("Humanoid")
-	end
-
-	local function r15(plr)
-		local hum = getHumanoid(plr.Character)
-		return hum and hum.RigType == Enum.HumanoidRigType.R15
-	end
 
 	local danceTrack = nil
 	local SpasmAnim, Spasm = nil, nil
@@ -2256,7 +2274,7 @@ end
 	animPanel.Visible                = false
 	animPanel.Parent                 = window
 
-local tabAnims, tabAnimsUnderline = sideTab("A", "Anims", 4)
+local tabAnims, tabAnimsUnderline = sideTab("person-standing", "Anims", 4)
 
 EmoteState = {
 	loaded = false, loading = false, busy = false, page = 1, pageSize = 45,
@@ -2264,9 +2282,9 @@ EmoteState = {
 	view = nil, playing = nil, track = nil,
 }
 
-EmoteState.tab, EmoteState.tabUnderline = sideTab("E", "Emote", 5)
+EmoteState.tab, EmoteState.tabUnderline = sideTab("party-popper", "Emote", 5)
 
-Settings.fav.tab, Settings.fav.tabUnderline = sideTab(utf8.char(0x2605), "Favorites", 6)
+Settings.fav.tab, Settings.fav.tabUnderline = sideTab("star", "Favorites", 6)
 
 function Settings.fav.style(btn, owner)
 	btn.BackgroundColor3 = Colors.gray30
@@ -3344,12 +3362,9 @@ addTab("anims", tabAnims, tabAnimsUnderline, animPanel, function() AnimState.loa
 addTab("emote", EmoteState.tab, EmoteState.tabUnderline, EmoteState.panel, function() EmoteState.load() end)
 addTab("favorites", Settings.fav.tab, Settings.fav.tabUnderline, Settings.fav.panel, function() Settings.fav.refresh() end)
 
-AnimState = AnimState
-EmoteState = EmoteState
+animCmds = {}
 
-local CommandActions = {}
-
-CommandActions.dance = function()
+animCmds.dance = function()
 	local hum = getHumanoid(player.Character)
 	if hum then
 		local anim = Instance.new("Animation")
@@ -3360,11 +3375,11 @@ CommandActions.dance = function()
 	end
 	notify("Dance","Enabled")
 end
-CommandActions.undance = function()
+animCmds.undance = function()
 	if danceTrack then danceTrack:Stop(); danceTrack:Destroy(); danceTrack = nil end
 	notify("Dance","Stopped")
 end
-CommandActions.spasm = function()
+animCmds.spasm = function()
 	if r15(player) then notify("Spasm","Requires R6"); return end
 	local hum = getHumanoid(player.Character)
 	if hum then
@@ -3376,23 +3391,23 @@ CommandActions.spasm = function()
 	end
 	notify("Spasm","Enabled")
 end
-CommandActions.unspasm = function()
+animCmds.unspasm = function()
 	if Spasm then Spasm:Stop() end
 	if SpasmAnim then SpasmAnim:Destroy() end
 	notify("Spasm","Disabled")
 end
-CommandActions.noanim = function()
+animCmds.noanim = function()
 	local animate = player.Character and player.Character:FindFirstChild("Animate")
 	if animate then animate.Disabled = true end
 	notify("Animations","Disabled")
 end
-CommandActions.reanim = function()
+animCmds.reanim = function()
 	local animate = player.Character and player.Character:FindFirstChild("Animate")
 	if animate then animate.Disabled = false end
 	notify("Animations","Restored")
 end
 
-CommandActions.animation = function(args)
+animCmds.animation = function(args)
 	local id = args and args[1]
 	if not id then notify("Animation","Provide an asset ID"); return end
 	local hum = getHumanoid(player.Character)
@@ -3405,7 +3420,7 @@ CommandActions.animation = function(args)
 	end
 end
 
-CommandActions.animspeed = function(args)
+animCmds.animspeed = function(args)
 	local spd = tonumber(args and args[1]) or 1
 	local hum = getHumanoid(player.Character)
 	if hum then
@@ -3413,21 +3428,21 @@ CommandActions.animspeed = function(args)
 	end
 end
 
-CommandActions.stopanims = function()
+animCmds.stopanims = function()
 	local hum = getHumanoid(player.Character)
 	if hum then
 		for _,t in pairs(hum:GetPlayingAnimationTracks()) do t:Stop() end
 	end
 end
 
-CommandActions.loopanim = function()
+animCmds.loopanim = function()
 	local hum = getHumanoid(player.Character)
 	if hum then
 		for _,t in pairs(hum:GetPlayingAnimationTracks()) do t.Looped = true end
 	end
 end
 
-CommandActions.copyanimid = function(args)
+animCmds.copyanimid = function(args)
 	local name = args and args[1]
 	local target = name and Players:FindFirstChild(name) or player
 	local hum = target.Character and target.Character:FindFirstChildOfClass("Humanoid")
@@ -3440,12 +3455,12 @@ CommandActions.copyanimid = function(args)
 	end
 end
 
-CommandActions.allowcustomanim = function()
+animCmds.allowcustomanim = function()
 	game:GetService("StarterPlayer").AllowCustomAnimations = true
 	CommandActions.refreshanimations()
 	notify("AllowCustomAnim","Enabled")
 end
-CommandActions.unallowcustomanim = function()
+animCmds.unallowcustomanim = function()
 	game:GetService("StarterPlayer").AllowCustomAnimations = false
 	CommandActions.refreshanimations()
 	notify("AllowCustomAnim","Disabled")
@@ -3474,19 +3489,19 @@ local _animIds = {
 	b3b3r15          = "13694096724",
 }
 for cmdName, animId in pairs(_animIds) do
-	CommandActions[cmdName] = function()
+	animCmds[cmdName] = function()
 		playAnim(animId, 0, 1, true)
 		Settings.keep(cmdName)
 		notify("Anim", cmdName)
 	end
 end
-CommandActions.stopanim = function()
+animCmds.stopanim = function()
 	stopAnimAll()
 	notify("StopAnim","Done")
 end
 
-CommandActions.copyanimationid = function(args)
-	CommandActions.copyanimid(args)
+animCmds.copyanimationid = function(args)
+	animCmds.copyanimid(args)
 end
 
 Settings.resumable = Settings.resumable or {}
@@ -3501,25 +3516,8 @@ for cmdName in pairs({
 	Settings.resumable[cmdName] = "stopanim"
 end
 
-animCmds = CommandActions
 end)();
-
 (function()
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
-local SoundService = game:GetService("SoundService")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local CoreGui = game:GetService("CoreGui")
-local GuiService = game:GetService("GuiService")
-local TextChatService = game:GetService("TextChatService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local VirtualUser = game:GetService("VirtualUser")
-local SocialService = game:GetService("SocialService")
-local StarterGui = game:GetService("StarterGui")
 
 local iyflyspeed = 1
 local vehicleflyspeed = 1
@@ -3570,10 +3568,6 @@ local _antiFlingData = {}
 local _antiFlingConns = {}
 local _checkpoint = nil
 
-local function r15(plr)
-	local hum = getHumanoid(plr.Character)
-	return hum and hum.RigType == Enum.HumanoidRigType.R15
-end
 local function breakVelocity()
 	local zero = Vector3.new(0,0,0)
 	for _, part in ipairs(player.Character:GetDescendants()) do
@@ -7508,7 +7502,7 @@ CommandActions.breakloops = function()
 	Settings.resume = {}
 	notify("BreakLoops","All loops stopped")
 end
-local function playAnim(id, timePos, speed, loop)
+function playAnim(id, timePos, speed, loop)
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if not hum then return end
@@ -7522,13 +7516,11 @@ local function playAnim(id, timePos, speed, loop)
 	if timePos then track.TimePosition = timePos end
 	return track
 end
-local function stopAnimAll()
+function stopAnimAll()
 	local char = player.Character
 	local hum = char and char:FindFirstChildOfClass("Humanoid")
 	if hum then for _,t in pairs(hum:GetPlayingAnimationTracks()) do t:Stop() end end
 end
-playAnim = playAnim
-stopAnimAll = stopAnimAll
 local function findPlayer(name)
 	if not name and Settings.target then return Settings.target end
 	if not name then return nil end
@@ -9050,14 +9042,9 @@ Settings.stoppers = {
 
 for k, v in pairs(animCmds or {}) do CommandActions[k] = v end
 
-CommandActions = CommandActions
-Commands = Commands
 targetCmds = playerTargetCmds
 end)();
-
 (function()
-	local Players = game:GetService("Players")
-	local UserInputService = game:GetService("UserInputService")
 
 	local targetPanel = Instance.new("Frame")
 	targetPanel.Name                   = "TargetPanel"
@@ -9068,7 +9055,7 @@ end)();
 	targetPanel.Visible                = false
 	targetPanel.Parent                 = window
 
-	local tabTarget, tabTargetUnderline = sideTab("T", "Target", 3)
+	local tabTarget, tabTargetUnderline = sideTab("crosshair", "Target", 3)
 
 	local targetSection = Instance.new("Frame")
 	targetSection.Name = "TargetSection"
@@ -9241,8 +9228,6 @@ end)();
 		tool.Parent = player.Backpack
 	end)
 
-	targetCreated = targetCreated
-
 	local commandList = Instance.new("ScrollingFrame")
 	commandList.Name = "TargetCommandList"
 	commandList.Position = UDim2.new(0,6,0,126)
@@ -9256,13 +9241,13 @@ end)();
 	commandList.AutomaticCanvasSize = Enum.AutomaticSize.Y
 	commandList.Parent = targetPanel
 
-	local listLayout = Instance.new("UIListLayout", commandList)
-	listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-	listLayout.Padding = UDim.new(0,4)
+	local listGap = Instance.new("UIListLayout", commandList)
+	listGap.SortOrder = Enum.SortOrder.LayoutOrder
+	listGap.Padding = UDim.new(0,4)
 
-	local listPadding = Instance.new("UIPadding", commandList)
-	listPadding.PaddingTop = UDim.new(0,2)
-	listPadding.PaddingBottom = UDim.new(0,8)
+	local listInset = Instance.new("UIPadding", commandList)
+	listInset.PaddingTop = UDim.new(0,2)
+	listInset.PaddingBottom = UDim.new(0,8)
 
 	local extraArg = {
 		hitbox   = { kind = "slider", label = "Size (studs)",  min = 1, max = 50, step = 1, default = 10 },
